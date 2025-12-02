@@ -27,13 +27,23 @@ CASE state OF
 
 // STATE 1: PERIODIC TESTING
 1:
+    // Heartbeat monitoring - Check if remote device counter has changed
+    heartbeatChanged := (remoteHeartbeat_In <> lastHeartbeat);
+    lastHeartbeat := remoteHeartbeat_In;
+
+    // Heartbeat timeout - triggers if heartbeat doesn't change for 5 seconds
+    heartbeatTimeout(IN := NOT heartbeatChanged, PT := T#5s);
+    heartbeatOK := heartbeatChanged AND NOT heartbeatTimeout.Q;
+
     // Read network status from system variables and inputs
-    ethernetLinkStatus := _IO_EM_DO_01.0;  // Bit 0 = Physical Link Active
     networkStatusOK := NetworkStatus_In;
-    
+
+    // Combined Ethernet link status: heartbeat active AND network status OK
+    ethernetLinkStatus := heartbeatOK AND networkStatusOK;
+
     // Combine status checks for overall connectivity
-    isConnected := ethernetLinkStatus AND networkStatusOK;
-    
+    isConnected := ethernetLinkStatus;
+
     // Detect link state changes
     IF previousLinkStatus AND NOT ethernetLinkStatus THEN
         linkLossCount := linkLossCount + 1;
@@ -128,6 +138,13 @@ downtimeTimer(IN := NOT isConnected, PT := T#999h);
     END_IF;
     reportPart1 := reportPart1 + '$N';
 
+    IF heartbeatOK THEN
+        reportPart1 := reportPart1 + '  Heartbeat: ACTIVE';
+    ELSE
+        reportPart1 := reportPart1 + '  Heartbeat: TIMEOUT';
+    END_IF;
+    reportPart1 := reportPart1 + '$N';
+
     // PART 2: Statistics
     reportPart2 := '$NSTATISTICS:';
     reportPart2 := reportPart2 + '$N';
@@ -155,6 +172,12 @@ downtimeTimer(IN := NOT isConnected, PT := T#999h);
     reportPart3 := reportPart3 + '$N$N';
     reportPart3 := reportPart3 + 'DIAGNOSTICS:';
     reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '  View in CCW:';
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '    - remoteHeartbeat_In';
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '    - heartbeatOK';
+    reportPart3 := reportPart3 + '$N$N';
 
     IF linkLossCount > 5 THEN
         reportPart3 := reportPart3 + '  WARNING: Frequent losses';
