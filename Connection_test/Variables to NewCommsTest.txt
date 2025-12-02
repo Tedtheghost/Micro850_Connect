@@ -1,0 +1,58 @@
+//Variables to NewCommsTest
+
+VAR
+// Connectivity Test Parameters
+	testInterval : TIME := T#60s;
+	testTimer : TON;
+
+// Network Status Variables
+	isConnected : BOOL := FALSE;
+	lastConnectedTime : DT;
+	connectionUptime : TIME;
+	connectionDowntime : TIME;
+
+// EtherNet/IP Module Status
+	ethernetLinkStatus : BOOL := FALSE;
+	networkStatusOK : BOOL := FALSE;
+	previousLinkStatus : BOOL := FALSE;
+	linkLossCount : UDINT := 0;
+
+// Statistics
+	totalTests : UDINT := 0;
+	successfulTests : UDINT := 0;
+	failedTests : UDINT := 0;
+	connectivityPercent : REAL := 0.0;
+
+// Report Generation (split into parts due to 255 char limit)
+	reportReady : BOOL := FALSE;
+	reportPart1 : STRING[255];
+	reportPart2 : STRING[255];
+	reportPart3 : STRING[255];
+	//##lastReportTime : DT;
+
+// Internal State Machine
+	state : INT := 0;
+	firstScan : BOOL := TRUE;
+
+// Timers and Counters
+	uptimeTimer : TON;
+	downtimeTimer : TON;
+	reportTrigger : R_TRIG;
+
+// Helper Variables
+	tempString : STRING[200];
+	currentStatus : STRING[50];
+
+// Inputs
+	Enable : BOOL := TRUE;
+	GenerateReport : BOOL := FALSE;
+	LinkStatus_In : BOOL := TRUE;
+	NetworkStatus_In : BOOL := TRUE;
+
+// Outputs
+	NetworkStatus : BOOL;
+	LinkActive : BOOL;
+	ReportAvailable : BOOL;
+	StatusMessage : STRING[100];
+
+END_VAR

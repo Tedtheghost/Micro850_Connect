@@ -1,0 +1,179 @@
+PROGRAM Connection
+
+
+// First scan initialization
+IF firstScan THEN
+    totalTests := 0;
+    successfulTests := 0;
+    failedTests := 0;
+    linkLossCount := 0;
+    isConnected := FALSE;
+    state := 0;
+    reportReady := FALSE;
+    firstScan := FALSE;
+ END_IF;
+
+// Main state machine
+CASE state OF
+    
+ // STATE 0: INITIALIZATION
+0:
+    IF Enable THEN
+        state := 1;
+        StatusMessage := 'Monitoring Started';
+    ELSE
+        StatusMessage := 'Monitoring Disabled';
+    END_IF;
+
+// STATE 1: PERIODIC TESTING
+1:
+    // Read network status from system variables and inputs
+    ethernetLinkStatus := _IO_EM_DO_01.0;  // Bit 0 = Physical Link Active
+    networkStatusOK := NetworkStatus_In;
+    
+    // Combine status checks for overall connectivity
+    isConnected := ethernetLinkStatus AND networkStatusOK;
+    
+    // Detect link state changes
+    IF previousLinkStatus AND NOT ethernetLinkStatus THEN
+        linkLossCount := linkLossCount + 1;
+    END_IF;
+    previousLinkStatus := ethernetLinkStatus;
+    
+    // Run test timer - single call per scan
+    testTimer(IN := Enable AND NOT testTimer.Q, PT := testInterval);
+
+    // When timer expires, record connectivity test result
+	IF testTimer.Q THEN
+    totalTests := totalTests + 1;
+    
+    	IF isConnected THEN
+       		successfulTests := successfulTests + 1;
+        	currentStatus := 'CONNECTED';
+    	ELSE
+        	failedTests := failedTests + 1;
+        
+        // Determine specific failure reason
+        	IF NOT ethernetLinkStatus THEN
+            	currentStatus := 'NO PHYSICAL LINK';
+        	ELSIF NOT networkStatusOK THEN
+           		currentStatus := 'NETWORK ERROR';
+        	ELSE
+            	currentStatus := 'UNKNOWN ERROR';
+        	END_IF;
+    	END_IF;
+    // Calculate success rate
+    	IF totalTests > 0 THEN
+        connectivityPercent := (ANY_TO_REAL(successfulTests) / ANY_TO_REAL(totalTests)) * 100.0;
+   		END_IF;
+	
+	END_IF;
+
+// Track uptime/downtime - called once per scan with conditional input
+uptimeTimer(IN := isConnected, PT := T#999h);
+downtimeTimer(IN := NOT isConnected, PT := T#999h);
+
+// Update elapsed times
+	IF isConnected THEN
+    connectionUptime := uptimeTimer.ET;
+	ELSE
+    connectionDowntime := downtimeTimer.ET;
+	END_IF;
+        
+// Update outputs
+    NetworkStatus := isConnected;
+    LinkActive := ethernetLinkStatus;
+    
+    IF isConnected THEN
+        StatusMessage := 'All Systems Operational.';
+    ELSIF NOT ethernetLinkStatus THEN
+        StatusMessage := 'Gotta plug it in first...';
+    ELSE
+        StatusMessage := 'It no worky...';
+    END_IF;
+    
+    // Check for report request
+    reportTrigger(CLK := GenerateReport);
+    IF reportTrigger.Q THEN
+        state := 2;
+    END_IF;
+    
+    // STATE 2: GENERATE REPORT (split into 3 parts due to 255 char limit)
+2:
+    // PART 1: Header and Current Status
+    reportPart1 := '==================================';
+    reportPart1 := reportPart1 + '$N';
+    reportPart1 := reportPart1 + 'ETHERNET/IP REPORT';
+    reportPart1 := reportPart1 + '$N';
+    reportPart1 := reportPart1 + '==================================';
+    reportPart1 := reportPart1 + '$N$N';
+    reportPart1 := reportPart1 + 'STATUS:';
+    reportPart1 := reportPart1 + '$N';
+    tempString := '  Overall: ';
+    tempString := tempString + currentStatus;
+    reportPart1 := reportPart1 + tempString;
+    reportPart1 := reportPart1 + '$N';
+
+    IF ethernetLinkStatus THEN
+        reportPart1 := reportPart1 + '  Link: ACTIVE';
+    ELSE
+        reportPart1 := reportPart1 + '  Link: DOWN';
+    END_IF;
+    reportPart1 := reportPart1 + '$N';
+
+    IF networkStatusOK THEN
+        reportPart1 := reportPart1 + '  Module: ONLINE';
+    ELSE
+        reportPart1 := reportPart1 + '  Module: FAULT';
+    END_IF;
+    reportPart1 := reportPart1 + '$N';
+
+    // PART 2: Statistics
+    reportPart2 := '$NSTATISTICS:';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '  View in CCW:';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '    - totalTests';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '    - successfulTests';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '    - failedTests';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '    - linkLossCount';
+    reportPart2 := reportPart2 + '$N';
+    reportPart2 := reportPart2 + '    - connectivityPercent';
+    reportPart2 := reportPart2 + '$N';
+
+    // PART 3: Timing and Diagnostics
+    reportPart3 := '$NTIMING:';
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '  View in CCW:';
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '    - connectionUptime';
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '    - connectionDowntime';
+    reportPart3 := reportPart3 + '$N$N';
+    reportPart3 := reportPart3 + 'DIAGNOSTICS:';
+    reportPart3 := reportPart3 + '$N';
+
+    IF linkLossCount > 5 THEN
+        reportPart3 := reportPart3 + '  WARNING: Frequent losses';
+        reportPart3 := reportPart3 + '$N';
+        reportPart3 := reportPart3 + '  It No Worky...';
+    ELSIF linkLossCount > 0 THEN
+        reportPart3 := reportPart3 + '  Connection unstable';
+    ELSE
+        reportPart3 := reportPart3 + '  Network stable';
+    END_IF;
+    reportPart3 := reportPart3 + '$N';
+    reportPart3 := reportPart3 + '==================================';
+
+    // Set flags
+    reportReady := TRUE;
+    ReportAvailable := TRUE;
+
+    // Return to monitoring
+    state := 1;
+        
+END_CASE;
+END_PROGRAM

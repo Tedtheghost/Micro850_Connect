@@ -1,0 +1,9 @@
+[BEGIN FB INPUTS]
+I1=micro850.micro850.prog1/testtimer.in,0x44E,BOOL
+I2=micro850.micro850.prog1/testtimer.pt,0x480,TIME
+I3=micro850.micro850.prog1/uptimetimer.in,0x448,BOOL
+I4=micro850.micro850.prog1/uptimetimer.pt,0x1A94,TIME
+I5=micro850.micro850.prog1/downtimetimer.in,0x1A5A,BOOL
+I6=micro850.micro850.prog1/downtimetimer.pt,0x1A94,TIME
+I7=micro850.micro850.prog1/reporttrigger.clk,0x44F,BOOL
+[END]
