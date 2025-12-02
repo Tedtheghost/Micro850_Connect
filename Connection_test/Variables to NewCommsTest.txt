@@ -17,6 +17,13 @@ VAR
 	previousLinkStatus : BOOL := FALSE;
 	linkLossCount : UDINT := 0;
 
+// Heartbeat Monitoring
+	remoteHeartbeat_In : UDINT := 0;  // Input from remote device (HMI/SCADA)
+	lastHeartbeat : UDINT := 0;
+	heartbeatChanged : BOOL := FALSE;
+	heartbeatTimeout : TON;
+	heartbeatOK : BOOL := FALSE;
+
 // Statistics
 	totalTests : UDINT := 0;
 	successfulTests : UDINT := 0;
