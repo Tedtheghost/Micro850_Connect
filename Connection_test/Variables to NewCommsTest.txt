@@ -7,7 +7,6 @@ VAR
 
 // Network Status Variables
 	isConnected : BOOL := FALSE;
-	lastConnectedTime : DT;
 	connectionUptime : TIME;
 	connectionDowntime : TIME;
 
